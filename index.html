@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urbanstreet Hairstudio - POS & Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- STYLESHEET KHUSUS PRINT THERMAL -->
+    <style>
+    @media print {
+        body * {
+            visibility: hidden !important;
+        }
+        #receipt-print-area, #receipt-print-area * {
+            visibility: visible !important;
+        }
+        #receipt-print-area {
+            display: block !important;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+    }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans text-gray-800">
+
+    <!-- LOGIN / AUTH MODAL -->
+    <div id="auth-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center">
+            <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="scissors" class="w-8 h-8"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-1">Urbanstreet POS</h2>
+            <p class="text-sm text-gray-500 mb-6">Masukkan PIN Akses Anda</p>
+            
+            <input type="password" id="pin-input" maxlength="6" placeholder="******" class="w-full text-center text-3xl tracking-widest font-bold py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 mb-4">
+            
+            <div id="pin-error" class="text-red-500 text-xs mb-4 hidden">PIN Salah! Silakan coba lagi.</div>
+            
+            <button onclick="authenticate()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-200">
+                Masuk
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="app-content" class="hidden">
+        
+        <!-- NAVBAR -->
+        <header class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shadow-md">
+            <div class="flex items-center space-x-3">
+                <i data-lucide="scissors" class="w-6 h-6 text-blue-400"></i>
+                <span class="font-bold text-lg tracking-wide">URBANSTREET HAIRSTUDIO</span>
+                <span id="role-badge" class="ml-2 text-xs px-2.5 py-1 rounded-full font-semibold"></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="fetchCloudData()" class="bg-slate-800 hover:bg-slate-700 text-xs text-gray-300 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1 transition">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Sync Data</span>
+                </button>
+                <button onclick="logout()" class="flex items-center space-x-1 bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded-lg transition">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span>Keluar</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- KASIR / POS VIEW -->
+        <main id="pos-view" class="p-4 md:p-6 max-w-7xl mx-auto space-y-6 hidden">
+            
+            <!-- RINGKASAN KAS LACI & TOTAL PENJUALAN KASIR -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div onclick="openTodaySalesModal()" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-blue-400 hover:shadow transition">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Total Penjualan Hari Ini <span class="text-[10px] text-blue-600 underline block">Klik rincian &rarr;</span></p>
+                        <h3 id="stat-total-sales" class="text-xl font-bold text-gray-800 mt-1">Rp0</h3>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full text-blue-600"><i data-lucide="trending-up" class="w-6 h-6"></i></div>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Uang Kas di Laci (Saldo Berjalan)</p>
+                        <h3 id="stat-cash-drawer" class="text-xl font-bold text-green-700 mt-1">Rp0</h3>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full text-green-600"><i data-lucide="wallet" class="w-6 h-6"></i></div>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between sm:col-span-2 lg:col-span-1">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Operasional Kasir</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Catat pengeluaran toko dari kas laci</p>
+                    </div>
+                    <button onclick="openExpenseModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1 shadow transition">
+                        <i data-lucide="minus-circle" class="w-4 h-4"></i>
+                        <span>+ Catat Pengeluaran</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- KATALOG & DRAFT TRANSAKSI -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- LEFT: KATALOG ITEM -->
+                <div class="lg:col-span-2 space-y-4">
+                    
+                    <!-- FILTER BARBERS -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <label class="font-semibold text-gray-700 flex items-center gap-2">
+                            <i data-lucide="user" class="w-4 h-4 text-blue-600"></i> Capster / Barber:
+                        </label>
+                        <select id="barber-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 w-full sm:w-64 font-medium">
+                            <option value="Said">Said</option>
+                            <option value="Galang">Galang</option>
+                            <option value="Heri">Heri</option>
+                        </select>
+                    </div>
+
+                    <!-- TABS KATEGORI -->
+                    <div class="flex border-b border-gray-200 bg-white rounded-t-xl px-4 pt-3 gap-2">
+                        <button onclick="switchTab('Haircuts')" id="tab-Haircuts" class="tab-btn px-4 py-2 font-medium text-sm rounded-t-lg border-b-2 border-blue-600 text-blue-600">Haircuts</button>
+                        <button onclick="switchTab('Additional')" id="tab-Additional" class="tab-btn px-4 py-2 font-medium text-sm text-gray-500 hover:text-gray-700">Additional Services</button>
+                        <button onclick="switchTab('Products')" id="tab-Products" class="tab-btn px-4 py-2 font-medium text-sm text-gray-500 hover:text-gray-700">Products</button>
+                    </div>
+
+                    <!-- ITEM GRID -->
+                    <div id="items-container" class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-white p-4 rounded-b-xl shadow-sm border border-gray-200 min-h-[350px]">
+                    </div>
+                </div>
+
+                <!-- RIGHT: SUMMARY & PAYMENTS -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg mb-4 text-gray-800 border-b pb-2 flex justify-between items-center">
+                            <span>Detail Transaksi</span>
+                            <i data-lucide="shopping-cart" class="w-5 h-5 text-gray-500"></i>
+                        </h3>
+
+                        <!-- CUSTOMER SELECT / INPUT -->
+                        <div class="space-y-3 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-600 block mb-1">Pilih Pelanggan Setia</label>
+                                <select id="customer-dropdown" onchange="handleCustomerSelect()" class="w-full text-xs p-2 border rounded bg-white">
+                                    <option value="">-- Pelanggan Baru / Manual --</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="cust-name" placeholder="Nama Pelanggan" class="text-xs p-2 border rounded w-full">
+                                <input type="text" id="cust-wa" placeholder="No. WA (cth: 0812..)" class="text-xs p-2 border rounded w-full">
+                            </div>
+                        </div>
+
+                        <!-- LOYALTY NOTIFICATION BANNER -->
+                        <div id="loyalty-banner" class="hidden bg-amber-50 border-l-4 border-amber-500 p-3 mb-4 rounded-r-lg">
+                            <div class="flex items-start">
+                                <i data-lucide="gift" class="w-5 h-5 text-amber-600 mr-2 flex-shrink-0 mt-0.5"></i>
+                                <div>
+                                    <p class="text-xs font-bold text-amber-800">SELAMAT! KUNJUNGAN KE-5</p>
+                                    <p class="text-xs text-amber-700">Pelanggan berhak menerima layanan <b>FREE Wash Dry Hot Towel</b>!</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CART ITEMS TABLE -->
+                        <div class="max-h-48 overflow-y-auto mb-4 border-b">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-gray-400 border-b">
+                                    <tr>
+                                        <th class="pb-1">Item</th>
+                                        <th class="pb-1 text-center">Qty</th>
+                                        <th class="pb-1 text-right">Harga</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cart-table-body" class="divide-y">
+                                    <tr><td colspan="4" class="py-4 text-center text-gray-400">Keranjang kosong</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- PAYMENT INPUTS -->
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Subtotal</span>
+                                <span id="txt-subtotal" class="font-bold">Rp0</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Diskon (Rp)</span>
+                                <input type="number" id="input-discount" value="0" oninput="calculateTotal()" class="w-24 text-right border rounded p-1">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Tip Capster (Rp)</span>
+                                <input type="number" id="input-tip" value="0" oninput="calculateTotal()" class="w-24 text-right border rounded p-1">
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t text-sm font-extrabold text-blue-900">
+                                <span>TOTAL BAYAR</span>
+                                <span id="txt-total">Rp0</span>
+                            </div>
+                        </div>
+
+                        <!-- METODE PEMBAYARAN -->
+                        <div class="mt-4">
+                            <label class="text-xs font-semibold text-gray-600 block mb-1">Metode Pembayaran</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setPaymentMethod('Cash')" id="pay-cash" class="pay-btn border border-blue-600 bg-blue-50 text-blue-700 font-bold py-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                                    <i data-lucide="banknote" class="w-4 h-4"></i> Cash
+                                </button>
+                                <button onclick="setPaymentMethod('QRIS')" id="pay-qris" class="pay-btn border border-gray-300 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 text-gray-600">
+                                    <i data-lucide="qr-code" class="w-4 h-4"></i> QRIS
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- UPLOAD BUKTI QRIS -->
+                        <div id="qris-upload-section" class="mt-3 hidden">
+                            <label class="text-xs text-gray-500 block mb-1">Bukti Transfer QRIS</label>
+                            <input type="file" id="qris-file" class="text-xs w-full text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700">
+                        </div>
+                    </div>
+
+                    <!-- SUBMIT BUTTON -->
+                    <button id="btn-submit-tx" onclick="submitTransaction()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl mt-6 transition shadow-lg shadow-green-100 flex items-center justify-center gap-2">
+                        <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                        <span>Simpan Transaksi</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- OWNER DASHBOARD VIEW -->
+        <main id="owner-view" class="p-4 md:p-6 max-w-7xl mx-auto space-y-6 hidden">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-gray-800">Dashboard Owner</h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500 font-medium">Periode:</span>
+                    <select id="owner-month-select" onchange="renderOwnerDashboard()" class="bg-white border rounded-lg px-3 py-1 text-xs font-semibold text-gray-700">
+                    </select>
+                </div>
+            </div>
+
+            <!-- REKAP KOMISI BULANAN -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Komisi Bulanan: <b>Said</b></p>
+                        <h3 id="commission-said" class="text-2xl font-bold text-gray-800 mt-1">Rp0</h3>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full text-blue-600"><i data-lucide="user-check"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Komisi Bulanan: <b>Galang</b></p>
+                        <h3 id="commission-galang" class="text-2xl font-bold text-gray-800 mt-1">Rp0</h3>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full text-green-600"><i data-lucide="user-check"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Komisi Bulanan: <b>Heri</b></p>
+                        <h3 id="commission-heri" class="text-2xl font-bold text-gray-800 mt-1">Rp0</h3>
+                    </div>
+                    <div class="bg-purple-100 p-3 rounded-full text-purple-600"><i data-lucide="user-check"></i></div>
+                </div>
+            </div>
+
+            <!-- LAPORAN PERFORMA & ANALISIS PENJUALAN BULANAN -->
+            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <h3 class="font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 text-blue-600"></i>
+                    <span>Laporan Penjualan & Performa Bulanan</span>
+                </h3>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div onclick="openMonthlyOmzetModal()" class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-3 rounded-lg cursor-pointer hover:shadow transition">
+                        <p class="text-[11px] text-indigo-600 font-bold uppercase">Total Omzet Bulan Berjalan</p>
+                        <p id="kpi-monthly-omzet" class="text-base font-extrabold text-indigo-900 mt-0.5">Rp0</p>
+                        <span class="text-[10px] text-indigo-600 underline mt-0.5 block">Klik rincian harian &rarr;</span>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg">
+                        <p class="text-[11px] text-blue-600 font-bold uppercase">Best Capster of The Month</p>
+                        <p id="kpi-best-capster" class="text-base font-extrabold text-blue-900 mt-0.5">-</p>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-100 p-3 rounded-lg">
+                        <p class="text-[11px] text-emerald-600 font-bold uppercase">Layanan Favorit (Haircuts)</p>
+                        <p id="kpi-fav-haircut" class="text-base font-extrabold text-emerald-900 mt-0.5">-</p>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-100 p-3 rounded-lg">
+                        <p class="text-[11px] text-purple-600 font-bold uppercase">Additional Favorit</p>
+                        <p id="kpi-fav-additional" class="text-base font-extrabold text-purple-900 mt-0.5">-</p>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-100 p-3 rounded-lg">
+                        <p class="text-[11px] text-amber-600 font-bold uppercase">Product Favorit</p>
+                        <p id="kpi-fav-product" class="text-base font-extrabold text-amber-900 mt-0.5">-</p>
+                    </div>
+                </div>
+
+                <!-- MARKETING INSIGHT SECTION -->
+                <div class="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2 mt-4">
+                    <h4 class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                        <i data-lucide="lightbulb" class="w-4 h-4 text-amber-500"></i>
+                        <span>Insight Pemasaran & Statistik Toko (Bulan Ini)</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                            <span class="font-bold text-gray-700 block mb-1">📊 Analisis Kategori Keramaian Pelanggan:</span>
+                            <p id="insight-traffic" class="text-gray-600 leading-relaxed">Memuat data analisis...</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                            <span class="font-bold text-gray-700 block mb-1">⏰ Analisis Jam Aktif & Waktu Paling Ramai:</span>
+                            <p id="insight-active-hours" class="text-gray-600 leading-relaxed">Memuat data analisis...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CATEGORY SALES BREAKDOWN (Dapat Diklik untuk Rincian) -->
+                <div class="grid grid-cols-3 gap-3 text-center bg-gray-50 p-3 rounded-lg border text-xs">
+                    <div onclick="openCategoryDetailModal('Haircuts')" class="p-2 rounded-lg hover:bg-blue-100 cursor-pointer transition border border-transparent hover:border-blue-300">
+                        <span class="text-gray-500 block">Haircuts Terjual</span>
+                        <b id="qty-haircuts" class="text-sm font-bold text-gray-800">0 Item</b>
+                        <span class="text-[10px] text-blue-600 font-medium underline mt-1 block">Klik rincian &rarr;</span>
+                    </div>
+                    <div onclick="openCategoryDetailModal('Additional')" class="p-2 rounded-lg hover:bg-purple-100 cursor-pointer transition border border-transparent hover:border-purple-300">
+                        <span class="text-gray-500 block">Additional Services</span>
+                        <b id="qty-additional" class="text-sm font-bold text-gray-800">0 Item</b>
+                        <span class="text-[10px] text-purple-600 font-medium underline mt-1 block">Klik rincian &rarr;</span>
+                    </div>
+                    <div onclick="openCategoryDetailModal('Products')" class="p-2 rounded-lg hover:bg-amber-100 cursor-pointer transition border border-transparent hover:border-amber-300">
+                        <span class="text-gray-500 block">Products Terjual</span>
+                        <b id="qty-products" class="text-sm font-bold text-gray-800">0 Item</b>
+                        <span class="text-[10px] text-amber-600 font-medium underline mt-1 block">Klik rincian &rarr;</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLE REKAPITULASI TRANSAKSI PER HARI -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="p-4 border-b flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800">Rekapitulasi Transaksi Per Hari</h3>
+                    <span class="text-xs text-gray-400">Klik baris tanggal untuk rincian transaksi harian</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-500 border-b">
+                            <tr>
+                                <th class="p-3">Tanggal</th>
+                                <th class="p-3 text-right">Penjualan Service</th>
+                                <th class="p-3 text-right">Penjualan Produk</th>
+                                <th class="p-3 text-center">Pelanggan</th>
+                                <th class="p-3 text-right">Pengeluaran</th>
+                                <th class="p-3 text-right">Saldo Kas Laci</th>
+                            </tr>
+                        </thead>
+                        <tbody id="owner-daily-summary-body" class="divide-y">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- EXPENSE MODAL (KASIR) -->
+    <div id="expense-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="font-bold text-lg text-gray-800 flex items-center gap-2">
+                    <i data-lucide="receipt-text" class="w-5 h-5 text-amber-500"></i>
+                    <span>Catat Pengeluaran Kas Operasional</span>
+                </h3>
+                <button onclick="closeExpenseModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Kategori Biaya</label>
+                    <select id="exp-category" class="w-full border rounded p-2 bg-white">
+                        <option value="Air Mineral">Air Mineral</option>
+                        <option value="Token Listrik">Token Listrik</option>
+                        <option value="Iuran Kebersihan">Iuran Kebersihan</option>
+                        <option value="Iuran Keamanan">Iuran Keamanan</option>
+                        <option value="Setoran ke Owner">Setoran ke Owner</option>
+                        <option value="Lain-lain">Lain-lain</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Keterangan / Deskripsi</label>
+                    <input type="text" id="exp-desc" placeholder="Contoh: Setoran tunai ke owner / Beli galon" class="w-full border rounded p-2">
+                </div>
+                <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Jumlah Biaya (Rp)</label>
+                    <input type="number" id="exp-amount" placeholder="0" class="w-full border rounded p-2 font-bold text-sm">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-6">
+                <button onclick="closeExpenseModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg transition text-xs">
+                    Batal
+                </button>
+                <button id="btn-submit-exp" onclick="submitExpense()" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg transition text-xs shadow">
+                    Simpan Pengeluaran
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL RINCIAN PENJUALAN HARI INI (KASIR) -->
+    <div id="today-sales-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-2xl w-full shadow-xl">
+            <div class="flex justify-between items-center border-b pb-3 mb-3">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">Rincian Penjualan Hari Ini</h3>
+                    <p id="today-sales-subtitle" class="text-xs text-gray-500"></p>
+                </div>
+                <button onclick="closeTodaySalesModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            
+            <div class="max-h-96 overflow-y-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 text-gray-500 border-b sticky top-0">
+                        <tr>
+                            <th class="p-2">Waktu</th>
+                            <th class="p-2">Capster</th>
+                            <th class="p-2">Pelanggan</th>
+                            <th class="p-2 text-right">Total Bayar</th>
+                            <th class="p-2 text-center">Metode</th>
+                            <th class="p-2 text-right">Komisi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="today-sales-table-body" class="divide-y">
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="closeTodaySalesModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg mt-5 transition text-xs">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- RINCIAN TRANSAKSI HARIAN MODAL FOR OWNER -->
+    <div id="daily-detail-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-2xl w-full shadow-xl">
+            <div class="flex justify-between items-center border-b pb-3 mb-3">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">Rincian Transaksi Harian</h3>
+                    <p id="modal-date-subtitle" class="text-xs text-gray-500"></p>
+                </div>
+                <button onclick="closeDailyDetailModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            
+            <div class="max-h-96 overflow-y-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 text-gray-500 border-b sticky top-0">
+                        <tr>
+                            <th class="p-2">Waktu</th>
+                            <th class="p-2">Capster</th>
+                            <th class="p-2">Pelanggan</th>
+                            <th class="p-2 text-right">Pembayaran</th>
+                            <th class="p-2 text-center">Metode</th>
+                            <th class="p-2 text-right">Omzet Produk</th>
+                            <th class="p-2 text-right">Komisi Barber</th>
+                        </tr>
+                    </thead>
+                    <tbody id="daily-detail-table-body" class="divide-y">
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="closeDailyDetailModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg mt-5 transition text-xs">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL RINCIAN ITEM PER KATEGORI (HAIRCUTS / ADDITIONAL / PRODUCTS) -->
+    <div id="category-detail-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+            <div class="flex justify-between items-center border-b pb-3 mb-3">
+                <div>
+                    <h3 id="category-modal-title" class="font-bold text-lg text-gray-800">Rincian Penjualan</h3>
+                    <p id="category-modal-subtitle" class="text-xs text-gray-500"></p>
+                </div>
+                <button onclick="closeCategoryDetailModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            
+            <div class="max-h-80 overflow-y-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 text-gray-500 border-b sticky top-0">
+                        <tr>
+                            <th class="p-2">Nama Item / Layanan</th>
+                            <th class="p-2 text-center">Terjual</th>
+                            <th class="p-2 text-right">Total Nominal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="category-detail-table-body" class="divide-y">
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="closeCategoryDetailModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg mt-5 transition text-xs">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- AREA STRUK KHUSUS PRINT (Sembunyi di layar, muncul saat di-print) -->
+    <div id="receipt-print-area" class="hidden print:block text-black font-mono text-xs p-2 max-w-[58mm] mx-auto">
+        <div class="text-center mb-2">
+            <h2 class="font-bold text-sm uppercase">Urbanstreet Hairstudio</h2>
+            <p class="text-[10px]">Jl. Contoh No. 123, Kota Anda</p>
+            <p class="text-[10px]">==============================</p>
+        </div>
+
+        <div class="space-y-0.5 text-[10px]">
+            <p>Tanggal : <span id="rec-date"></span></p>
+            <p>Pelanggan: <span id="rec-cust"></span></p>
+            <p>Capster  : <span id="rec-barber"></span></p>
+        </div>
+        <p class="text-[10px]">------------------------------</p>
+
+        <!-- LIST ITEM -->
+        <div id="rec-items" class="space-y-1 text-[10px]"></div>
+
+        <p class="text-[10px]">------------------------------</p>
+        <div class="text-[10px] space-y-0.5">
+            <div class="flex justify-between"><span>Subtotal:</span><span id="rec-subtotal"></span></div>
+            <div class="flex justify-between"><span>Diskon  :</span><span id="rec-discount"></span></div>
+            <div class="flex justify-between font-bold"><span>TOTAL   :</span><span id="rec-total"></span></div>
+            <div class="flex justify-between"><span>Metode  :</span><span id="rec-method"></span></div>
+        </div>
+        <p class="text-[10px]">==============================</p>
+
+        <!-- LOYALTY INFO -->
+        <div class="text-center text-[10px] my-2">
+            <p class="font-bold">Info Kunjungan: Kunjungan <span id="rec-visit-count">1</span> dari 5</p>
+            <p class="text-[9px] italic">*Free Wash Dry Hot Towel pada kunjungan ke-5</p>
+        </div>
+
+        <div class="text-center text-[10px] mt-3">
+            <p class="font-bold">Terima Kasih Atas Kunjungannya Bro!</p>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzARb0l8Rc0f8VR2LhCpqohwNXytaBO92xsHfgAYNYmzI1m3P0vrG8zsaS07E_vTWktDg/exec";
+
+        // MASTER DATA
+        const itemsMaster = [
+            { id: "ITEM-001", category: "Haircuts", name: "Haircuts Only Anak", price: 35000 },
+            { id: "ITEM-002", category: "Haircuts", name: "Haircuts Only Dewasa", price: 50000 },
+            { id: "ITEM-003", category: "Haircuts", name: "Haircuts Complete Anak", price: 50000 },
+            { id: "ITEM-004", category: "Haircuts", name: "Haircuts Complete Dewasa", price: 65000 },
+            { id: "ITEM-005", category: "Additional", name: "Shaving Jenggot/Kumis", price: 15000 },
+            { id: "ITEM-006", category: "Additional", name: "Head Massage", price: 35000 },
+            { id: "ITEM-007", category: "Additional", name: "Pikok", price: 30000 },
+            { id: "ITEM-008", category: "Additional", name: "Coloring Pria", price: 300000 },
+            { id: "ITEM-009", category: "Additional", name: "Coloring Wanita", price: 500000 },
+            { id: "ITEM-010", category: "Additional", name: "Creambath Pria", price: 50000 },
+            { id: "ITEM-011", category: "Additional", name: "Creambath Wanita", price: 95000 },
+            { id: "ITEM-012", category: "Additional", name: "Wash Dry Hot Towel", price: 30000 },
+            { id: "ITEM-013", category: "Additional", name: "Cornrow Pria", price: 350000 },
+            { id: "ITEM-014", category: "Additional", name: "Cornrow Wanita", price: 400000 },
+            { id: "ITEM-015", category: "Additional", name: "Gimbal Pria", price: 450000 },
+            { id: "ITEM-016", category: "Additional", name: "Gimbal Wanita", price: 600000 },
+            { id: "ITEM-017", category: "Additional", name: "Boxbraid Pria", price: 500000 },
+            { id: "ITEM-018", category: "Additional", name: "Boxbraid Wanita", price: 800000 },
+            { id: "ITEM-019", category: "Products", name: "Pomade", price: 35000 },
+            { id: "ITEM-020", category: "Products", name: "Clay", price: 40000 },
+            { id: "ITEM-021", category: "Products", name: "Hair Powder", price: 35000 },
+            { id: "ITEM-022", category: "Products", name: "Hair Tonic", price: 35000 },
+            { id: "ITEM-023", category: "Products", name: "Hair Serum", price: 75000 }
+        ];
+
+        let customersDB = [
+            { name: "Budi Santoso", wa: "081234567890", visitsIn4Months: 4 },
+            { name: "Andi Wijaya", wa: "085698765432", visitsIn4Months: 2 }
+        ];
+
+        let transactionsDB = [];
+        let expensesDB = [];
+
+        let activeTab = "Haircuts";
+        let cart = [];
+        let paymentMethod = "Cash";
+
+        // INITIALIZE APP
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            renderCustomerDropdown();
+            renderItems();
+            setupMonthOptions();
+            fetchCloudData();
+        });
+
+        // SINKRONISASI CLOUD LENGKAP
+        async function fetchCloudData() {
+            try {
+                console.log("Memuat data dari Google Sheets...");
+                let res = await fetch(GOOGLE_SCRIPT_URL, { redirect: "follow" });
+                let data = await res.json();
+                
+                transactionsDB = data.transactions || [];
+                expensesDB = data.expenses || [];
+                
+                updateCashierStats();
+                renderOwnerDashboard();
+                console.log("Data berhasil disinkronkan!", { transactionsDB, expensesDB });
+            } catch (err) {
+                console.error("Gagal terhubung ke Google Sheets:", err);
+            }
+        }
+
+        // AUTHENTICATION LOGIC
+        function authenticate() {
+            const pin = document.getElementById("pin-input").value;
+            const errorElement = document.getElementById("pin-error");
+            
+            if (pin === "010101") {
+                document.getElementById("auth-modal").classList.add("hidden");
+                document.getElementById("app-content").classList.remove("hidden");
+                document.getElementById("pos-view").classList.remove("hidden");
+                
+                const badge = document.getElementById("role-badge");
+                badge.innerText = "KASIR MODE";
+                badge.className = "ml-2 text-xs px-2.5 py-1 rounded-full font-semibold bg-blue-500 text-white";
+                
+                fetchCloudData();
+            } else if (pin === "050586") {
+                document.getElementById("auth-modal").classList.add("hidden");
+                document.getElementById("app-content").classList.remove("hidden");
+                document.getElementById("owner-view").classList.remove("hidden");
+                
+                const badge = document.getElementById("role-badge");
+                badge.innerText = "OWNER MODE";
+                badge.className = "ml-2 text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-500 text-white";
+                
+                fetchCloudData();
+            } else {
+                errorElement.classList.remove("hidden");
+            }
+        }
+
+        function logout() {
+            document.getElementById("pin-input").value = "";
+            document.getElementById("pin-error").classList.add("hidden");
+            document.getElementById("app-content").classList.add("hidden");
+            document.getElementById("pos-view").classList.add("hidden");
+            document.getElementById("owner-view").classList.add("hidden");
+            document.getElementById("auth-modal").classList.remove("hidden");
+        }
+
+        // STATS LOGIC (SALDO KAS BERJALAN & TOTAL HARI INI)
+        function updateCashierStats() {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            
+            let totalSalesToday = 0;
+            let totalCashInAll = 0;
+            let totalExpensesAll = 0;
+
+            transactionsDB.forEach(tx => {
+                let parsed = parseStandardDate(tx.date);
+                let txDateKey = parsed ? parsed.formatted : String(tx.date || "").trim();
+
+                if (txDateKey === todayStr) {
+                    totalSalesToday += Number(tx.total || 0);
+                }
+
+                if (tx.paymentMethod === "Cash") {
+                    totalCashInAll += Number(tx.total || 0);
+                }
+            });
+
+            expensesDB.forEach(exp => {
+                totalExpensesAll += Number(exp.amount || 0);
+            });
+
+            let cashInDrawer = totalCashInAll - totalExpensesAll;
+
+            document.getElementById("stat-total-sales").innerText = `Rp${totalSalesToday.toLocaleString("id-ID")}`;
+            document.getElementById("stat-cash-drawer").innerText = `Rp${cashInDrawer.toLocaleString("id-ID")}`;
+        }
+
+        // MODAL RINCIAN PENJUALAN HARI INI (KASIR)
+        function openTodaySalesModal() {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            
+            document.getElementById("today-sales-subtitle").innerText = `Tanggal: ${todayStr}`;
+            const tbody = document.getElementById("today-sales-table-body");
+            tbody.innerHTML = "";
+
+            const todayTxList = transactionsDB.filter(t => {
+                let parsed = parseStandardDate(t.date);
+                let key = parsed ? parsed.formatted : String(t.date).trim();
+                return key === todayStr;
+            });
+
+            if (todayTxList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">Belum ada transaksi pada hari ini.</td></tr>`;
+            } else {
+                todayTxList.forEach(tx => {
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="p-2 text-gray-500">${tx.time || "-"}</td>
+                        <td class="p-2 font-semibold text-gray-800">${tx.barber || "-"}</td>
+                        <td class="p-2">${tx.customer || "-"}</td>
+                        <td class="p-2 text-right font-bold">Rp${Number(tx.total || 0).toLocaleString("id-ID")}</td>
+                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${tx.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">${tx.paymentMethod || "Cash"}</span></td>
+                        <td class="p-2 text-right font-semibold text-blue-600">Rp${Number(tx.commission || 0).toLocaleString("id-ID")}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            document.getElementById("today-sales-modal").classList.remove("hidden");
+        }
+
+        function closeTodaySalesModal() {
+            document.getElementById("today-sales-modal").classList.add("hidden");
+        }
+
+        // EXPENSE LOGIC
+        function openExpenseModal() {
+            document.getElementById("expense-modal").classList.remove("hidden");
+        }
+
+        function closeExpenseModal() {
+            document.getElementById("expense-modal").classList.add("hidden");
+            document.getElementById("exp-desc").value = "";
+            document.getElementById("exp-amount").value = "";
+        }
+
+        async function submitExpense() {
+            const category = document.getElementById("exp-category").value;
+            const desc = document.getElementById("exp-desc").value || category;
+            const amount = parseFloat(document.getElementById("exp-amount").value) || 0;
+
+            if (amount <= 0) {
+                alert("Jumlah nominal pengeluaran harus lebih dari 0!");
+                return;
+            }
+
+            const btn = document.getElementById("btn-submit-exp");
+            btn.disabled = true;
+            btn.innerText = "Menyimpan ke Cloud...";
+
+            const now = new Date();
+            const dateStr = now.toISOString().split("T")[0];
+
+            const expRecord = {
+                action: "addExpense",
+                id: "EXP-" + Date.now(),
+                date: dateStr,
+                time: now.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }),
+                category: category,
+                desc: desc,
+                amount: amount
+            };
+
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify(expRecord)
+                });
+
+                closeExpenseModal();
+                alert("Pengeluaran operasional berhasil disimpan!");
+                await fetchCloudData();
+            } catch (err) {
+                alert("Gagal menyimpan ke Google Sheets.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Simpan Pengeluaran";
+            }
+        }
+
+        function switchTab(tabName) {
+            activeTab = tabName;
+            document.querySelectorAll(".tab-btn").forEach(btn => {
+                btn.className = "tab-btn px-4 py-2 font-medium text-sm text-gray-500 hover:text-gray-700";
+            });
+            const activeBtn = document.getElementById(`tab-${tabName}`);
+            activeBtn.className = "tab-btn px-4 py-2 font-medium text-sm rounded-t-lg border-b-2 border-blue-600 text-blue-600";
+            renderItems();
+        }
+
+        function renderItems() {
+            const container = document.getElementById("items-container");
+            container.innerHTML = "";
+            
+            const filtered = itemsMaster.filter(i => i.category === activeTab);
+            filtered.forEach(item => {
+                const card = document.createElement("div");
+                card.className = "border rounded-xl p-3 flex flex-col justify-between hover:border-blue-500 hover:shadow-md cursor-pointer transition bg-white";
+                card.onclick = () => addToCart(item);
+                card.innerHTML = `
+                    <div>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">${item.category}</span>
+                        <h4 class="font-bold text-sm text-gray-800 leading-snug">${item.name}</h4>
+                    </div>
+                    <div class="mt-3 flex justify-between items-center">
+                        <span class="text-xs font-semibold text-blue-600">Rp${item.price.toLocaleString("id-ID")}</span>
+                        <span class="bg-blue-50 text-blue-600 p-1 rounded-md"><i data-lucide="plus" class="w-3.5 h-3.5"></i></span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function addToCart(item) {
+            const existing = cart.find(c => c.id === item.id);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ ...item, qty: 1 });
+            }
+            renderCart();
+        }
+
+        function removeFromCart(itemId) {
+            cart = cart.filter(c => c.id !== itemId);
+            renderCart();
+        }
+
+        function renderCart() {
+            const tbody = document.getElementById("cart-table-body");
+            tbody.innerHTML = "";
+
+            if (cart.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-gray-400">Keranjang kosong</td></tr>`;
+                calculateTotal();
+                return;
+            }
+
+            cart.forEach(item => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td class="py-2 font-medium">${item.name}</td>
+                    <td class="py-2 text-center">${item.qty}</td>
+                    <td class="py-2 text-right">Rp${(item.price * item.qty).toLocaleString("id-ID")}</td>
+                    <td class="py-2 text-right"><button onclick="removeFromCart('${item.id}')" class="text-red-500 hover:text-red-700">&times;</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            calculateTotal();
+        }
+
+        function calculateTotal() {
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const discount = parseFloat(document.getElementById("input-discount").value) || 0;
+            const tip = parseFloat(document.getElementById("input-tip").value) || 0;
+            
+            const total = Math.max(0, subtotal - discount) + tip;
+
+            document.getElementById("txt-subtotal").innerText = `Rp${subtotal.toLocaleString("id-ID")}`;
+            document.getElementById("txt-total").innerText = `Rp${total.toLocaleString("id-ID")}`;
+        }
+
+        function setPaymentMethod(method) {
+            paymentMethod = method;
+            const cashBtn = document.getElementById("pay-cash");
+            const qrisBtn = document.getElementById("pay-qris");
+            const uploadSection = document.getElementById("qris-upload-section");
+
+            if (method === "Cash") {
+                cashBtn.className = "pay-btn border border-blue-600 bg-blue-50 text-blue-700 font-bold py-2 rounded-lg text-xs flex items-center justify-center gap-1";
+                qrisBtn.className = "pay-btn border border-gray-300 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 text-gray-600";
+                uploadSection.classList.add("hidden");
+            } else {
+                qrisBtn.className = "pay-btn border border-blue-600 bg-blue-50 text-blue-700 font-bold py-2 rounded-lg text-xs flex items-center justify-center gap-1";
+                cashBtn.className = "pay-btn border border-gray-300 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 text-gray-600";
+                uploadSection.classList.remove("hidden");
+            }
+        }
+
+        function renderCustomerDropdown() {
+            const dropdown = document.getElementById("customer-dropdown");
+            dropdown.innerHTML = `<option value="">-- Pelanggan Baru / Manual --</option>`;
+            customersDB.forEach((c, index) => {
+                dropdown.innerHTML += `<option value="${index}">${c.name} (${c.wa})</option>`;
+            });
+        }
+
+        function handleCustomerSelect() {
+            const selectedIdx = document.getElementById("customer-dropdown").value;
+            const banner = document.getElementById("loyalty-banner");
+
+            if (selectedIdx !== "") {
+                const cust = customersDB[selectedIdx];
+                document.getElementById("cust-name").value = cust.name;
+                document.getElementById("cust-wa").value = cust.wa;
+
+                if (cust.visitsIn4Months >= 4) {
+                    banner.classList.remove("hidden");
+                } else {
+                    banner.classList.add("hidden");
+                }
+            } else {
+                document.getElementById("cust-name").value = "";
+                document.getElementById("cust-wa").value = "";
+                banner.classList.add("hidden");
+            }
+        }
+
+        // SUBMIT TRANSAKSI DENGAN KOMISI PRODUK 20%
+        async function submitTransaction() {
+            if (cart.length === 0) {
+                alert("Keranjang belanja masih kosong!");
+                return;
+            }
+
+            const btn = document.getElementById("btn-submit-tx");
+            btn.disabled = true;
+            btn.innerText = "Menyimpan ke Cloud...";
+
+            const barberName = document.getElementById("barber-select").value;
+            const custName = document.getElementById("cust-name").value || "Umum";
+            const custWa = document.getElementById("cust-wa").value || "-";
+            const discount = parseFloat(document.getElementById("input-discount").value) || 0;
+            const tip = parseFloat(document.getElementById("input-tip").value) || 0;
+
+            let serviceSales = 0;
+            let productSales = 0;
+
+            cart.forEach(item => {
+                if (item.category === "Products") {
+                    productSales += (item.price * item.qty);
+                } else {
+                    serviceSales += (item.price * item.qty);
+                }
+            });
+
+            const subtotal = serviceSales + productSales;
+            const totalAmount = Math.max(0, subtotal - discount) + tip;
+
+            const now = new Date();
+            const currentHour = now.getHours();
+            const dateStr = now.toISOString().split("T")[0];
+
+            let serviceCommRate = 0.40;
+            if (barberName === "Heri" || currentHour >= 22 || currentHour < 10) {
+                serviceCommRate = 0.50;
+            }
+            const productCommRate = 0.20; // Komisi produk diubah menjadi 20%
+            const commission = (serviceSales * serviceCommRate) + (productSales * productCommRate);
+
+            const txRecord = {
+                action: "addTransaction",
+                id: "TRX-" + Date.now(),
+                date: dateStr,
+                time: now.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }),
+                barber: barberName,
+                customer: custName,
+                wa: custWa,
+                items: cart,
+                serviceSales: serviceSales,
+                productSales: productSales,
+                subtotal: subtotal,
+                discount: discount,
+                tip: tip,
+                total: totalAmount,
+                paymentMethod: paymentMethod,
+                commission: commission
+            };
+
+           const payload = {
+                ...txRecord,
+                items: JSON.stringify(cart)
+            };
+
+           try {
+               await fetch(GOOGLE_SCRIPT_URL, {
+                     method: "POST",
+                     mode: "no-cors",
+                     headers: { "Content-Type": "text/plain" },
+                     body: JSON.stringify(payload)
+                });
+
+                let custIndex = document.getElementById("customer-dropdown").value;
+                let currentVisit = 1;
+
+                if (custIndex !== "") {
+                    customersDB[custIndex].visitsIn4Months = (customersDB[custIndex].visitsIn4Months || 0) + 1;
+                    currentVisit = customersDB[custIndex].visitsIn4Months;
+                } else if (custName !== "Umum") {
+                    let existingCust = customersDB.find(c => 
+                        (custWa !== "-" && c.wa === custWa) || 
+                        c.name.toLowerCase() === custName.toLowerCase()
+                    );
+
+                    if (existingCust) {
+                        existingCust.visitsIn4Months = (existingCust.visitsIn4Months || 0) + 1;
+                        currentVisit = existingCust.visitsIn4Months;
+                    } else {
+                        customersDB.push({
+                            name: custName,
+                            wa: custWa,
+                            visitsIn4Months: 1
+                        });
+                        currentVisit = 1;
+                    }
+                    renderCustomerDropdown();
+                }
+
+                if (custWa !== "-" && confirm("Apakah ingin mengirimkan nota teks via WhatsApp ke pelanggan?")) {
+                    sendWhatsAppReceipt(txRecord, currentVisit);
+                }
+
+                if (confirm("Apakah ingin mencetak nota transaksi?")) {
+                    printThermalReceipt(txRecord, currentVisit);
+                }
+
+                cart = [];
+                document.getElementById("input-discount").value = 0;
+                document.getElementById("input-tip").value = 0;
+                document.getElementById("customer-dropdown").value = "";
+                document.getElementById("cust-name").value = "";
+                document.getElementById("cust-wa").value = "";
+
+                handleCustomerSelect();
+                renderCart();
+
+                alert("Transaksi Berhasil Disimpan!");
+                await fetchCloudData();
+
+            } catch (err) {
+                alert("Gagal menyimpan transaksi.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="check-circle-2" class="w-5 h-5"></i><span>Simpan Transaksi</span>`;
+                lucide.createIcons();
+            }
+        }
+
+        function setupMonthOptions() {
+             const select = document.getElementById("owner-month-select");
+             if (!select) return;
+             select.innerHTML = "";
+             const now = new Date();
+
+             for (let i = 0; i < 6; i++) {
+                 let d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                 let year = d.getFullYear();
+                 let month = String(d.getMonth() + 1).padStart(2, '0');
+                 let value = `${year}-${month}`;
+                 let label = d.toLocaleDateString("id-ID", { month: 'long', year: 'numeric' });
+                 select.innerHTML += `<option value="${value}">${label}</option>`;
+             }
+        }
+
+        function parseStandardDate(dateInput) {
+            if (!dateInput) return null;
+            let str = String(dateInput).trim();
+
+            if (str.includes("-")) {
+                let cleanStr = str.split("T")[0].split(" ")[0];
+                let parts = cleanStr.split("-");
+                if (parts.length === 3) {
+                    let year, month, day;
+                    if (parts[0].length === 4) {
+                        year = parts[0];
+                        month = parts[1].padStart(2, '0');
+                        day = parts[2].padStart(2, '0');
+                    } else if (parts[2].length === 4) {
+                        year = parts[2];
+                        let p1 = parseInt(parts[0], 10);
+                        let p2 = parseInt(parts[1], 10);
+                        if (p1 > 12) {
+                            day = String(p1).padStart(2, '0');
+                            month = String(p2).padStart(2, '0');
+                        } else {
+                            month = String(p2).padStart(2, '0');
+                            day = String(p1).padStart(2, '0');
+                        }
+                    }
+                    if (year && month && day) {
+                        return { year, month, day, formatted: `${year}-${month}-${day}` };
+                    }
+                }
+            }
+
+            if (str.includes("/")) {
+                let cleanStr = str.split(" ")[0];
+                let parts = cleanStr.split("/");
+                if (parts.length === 3) {
+                    let year = parts[2].length === 2 ? "20" + parts[2] : parts[2];
+                    let num1 = parseInt(parts[0], 10);
+                    let num2 = parseInt(parts[1], 10);
+                    
+                    let month, day;
+                    if (num1 > 12) {
+                        day = String(num1).padStart(2, '0');
+                        month = String(num2).padStart(2, '0');
+                    } else if (num2 > 12) {
+                        month = String(num1).padStart(2, '0');
+                        day = String(num2).padStart(2, '0');
+                    } else {
+                        day = String(num1).padStart(2, '0');
+                        month = String(num2).padStart(2, '0');
+                    }
+
+                    return { year, month, day, formatted: `${year}-${month}-${day}` };
+                }
+            }
+
+            return null;
+        }
+
+        function safeParseItems(itemsData) {
+            if (!itemsData) return [];
+            if (Array.isArray(itemsData)) return itemsData;
+            if (typeof itemsData === "object") return [itemsData];
+            if (typeof itemsData === "string") {
+                try {
+                    let parsed = JSON.parse(itemsData);
+                    if (Array.isArray(parsed)) return parsed;
+                    if (typeof parsed === "object" && parsed !== null) return [parsed];
+                } catch (e) {
+                    return [];
+                }
+            }
+            return [];
+        }
+
+        // RENDER DASHBOARD OWNER LENGKAP DENGAN OMZET BULAN BERJALAN & INSIGHT PEMASARAN
+        function renderOwnerDashboard() {
+            const selectElem = document.getElementById("owner-month-select");
+            if (!selectElem) return;
+            
+            const selectedMonth = selectElem.value;
+            const [selYear, selMonth] = selectedMonth.split("-");
+            
+            function isSameMonth(dateInput) {
+                let parsed = parseStandardDate(dateInput);
+                if (parsed) {
+                    return parsed.year === selYear && parsed.month === selMonth;
+                }
+                return String(dateInput).includes(selectedMonth);
+            }
+
+            const filteredTx = transactionsDB.filter(t => isSameMonth(t.date));
+            const filteredExp = expensesDB.filter(e => isSameMonth(e.date));
+
+            let totalCommSaid = 0, totalCommGalang = 0, totalCommHeri = 0;
+            let capsterTxCount = { Said: 0, Galang: 0, Heri: 0 };
+            let itemQtyCount = {};
+            let totalMonthlyOmzet = 0;
+
+            let qtyHaircuts = 0, qtyAdditional = 0, qtyProducts = 0;
+            let dailyMap = {};
+            
+            // Variabel untuk Insight Pemasaran
+            let dailyCustomerCount = {}; // { "YYYY-MM-DD": count }
+            let timeSlotCounts = { slot1: 0, slot2: 0, slot3: 0, slot4: 0 }; // Slot waktu
+
+            filteredTx.forEach(tx => {
+                let txTotal = Number(tx.total || 0);
+                totalMonthlyOmzet += txTotal;
+
+                if (tx.barber === "Said") totalCommSaid += Number(tx.commission || 0);
+                if (tx.barber === "Galang") totalCommGalang += Number(tx.commission || 0);
+                if (tx.barber === "Heri") totalCommHeri += Number(tx.commission || 0);
+
+                if (tx.barber) capsterTxCount[tx.barber] = (capsterTxCount[tx.barber] || 0) + 1;
+
+                let parsed = parseStandardDate(tx.date);
+                let dateKey = parsed ? parsed.formatted : String(tx.date || "").trim();
+                
+                if (dateKey) {
+                    dailyCustomerCount[dateKey] = (dailyCustomerCount[dateKey] || 0) + 1;
+                }
+
+                // Analisis Jam Aktif Pelanggan berdasarkan tx.time (cth: "14:30" atau "14.30")
+                if (tx.time) {
+                    let hourNum = parseInt(tx.time.replace('.', ':').split(':')[0], 10);
+                    if (!isNaN(hourNum)) {
+                        if (hourNum >= 10 && hourNum < 14) timeSlotCounts.slot1++;
+                        else if (hourNum >= 14 && hourNum < 18) timeSlotCounts.slot2++;
+                        else if (hourNum >= 18 && hourNum <= 22) timeSlotCounts.slot3++;
+                        else timeSlotCounts.slot4++;
+                    }
+                }
+
+                let parsedItems = safeParseItems(tx.items);
+                parsedItems.forEach(item => {
+                    let qty = Number(item.qty || 1);
+                    let itemName = item.name || "Item Tanpa Nama";
+                    
+                    itemQtyCount[itemName] = (itemQtyCount[itemName] || 0) + qty;
+
+                    let masterMatch = itemsMaster.find(m => m.name.toLowerCase() === itemName.toLowerCase());
+                    let cat = item.category || (masterMatch ? masterMatch.category : "");
+
+                    if (cat === "Haircuts") qtyHaircuts += qty;
+                    else if (cat === "Additional") qtyAdditional += qty;
+                    else if (cat === "Products") qtyProducts += qty;
+                });
+            });
+
+            // Render Total Omzet Bulan Berjalan
+            document.getElementById("kpi-monthly-omzet").innerText = `Rp${totalMonthlyOmzet.toLocaleString("id-ID")}`;
+
+            document.getElementById("commission-said").innerText = `Rp${totalCommSaid.toLocaleString("id-ID")}`;
+            document.getElementById("commission-galang").innerText = `Rp${totalCommGalang.toLocaleString("id-ID")}`;
+            document.getElementById("commission-heri").innerText = `Rp${totalCommHeri.toLocaleString("id-ID")}`;
+
+            document.getElementById("qty-haircuts").innerText = `${qtyHaircuts} Item`;
+            document.getElementById("qty-additional").innerText = `${qtyAdditional} Item`;
+            document.getElementById("qty-products").innerText = `${qtyProducts} Item`;
+
+            let bestCapster = Object.keys(capsterTxCount).reduce((a, b) => capsterTxCount[a] > capsterTxCount[b] ? a : b, "Said");
+            document.getElementById("kpi-best-capster").innerText = filteredTx.length > 0 ? `${bestCapster} (${capsterTxCount[bestCapster]} TRX)` : "-";
+
+            let findFavItemByCategory = (cat) => {
+                let topItem = "-";
+                let maxQty = 0;
+                Object.keys(itemQtyCount).forEach(name => {
+                    let match = itemsMaster.find(m => m.name.toLowerCase() === name.toLowerCase());
+                    if (match && match.category === cat) {
+                        if (itemQtyCount[name] > maxQty) {
+                            maxQty = itemQtyCount[name];
+                            topItem = name;
+                        }
+                    }
+                });
+                return maxQty > 0 ? `${topItem} (${maxQty}x)` : "-";
+            };
+
+            document.getElementById("kpi-fav-haircut").innerText = findFavItemByCategory("Haircuts");
+            document.getElementById("kpi-fav-additional").innerText = findFavItemByCategory("Additional");
+            document.getElementById("kpi-fav-product").innerText = findFavItemByCategory("Products");
+
+            // GENERATE MARKETING INSIGHTS
+            let quietDays = 0;
+            let busyDays = 0;
+            Object.values(dailyCustomerCount).forEach(count => {
+                if (count <= 4) quietDays++;
+                else busyDays++;
+            });
+
+            let trafficInsight = `Dari total ${Object.keys(dailyCustomerCount).length} hari operasional tercatat ${quietDays} hari berstatus sepi (≤4 pelanggan) dan ${busyDays} hari berstatus ramai (>4 pelanggan). Tips: Berikan promo khusus di hari-hari sepi.`;
+            document.getElementById("insight-traffic").innerText = trafficInsight;
+
+            let maxSlotVal = Math.max(timeSlotCounts.slot1, timeSlotCounts.slot2, timeSlotCounts.slot3, timeSlotCounts.slot4);
+            let peakTimeStr = "Belum cukup data";
+            if (maxSlotVal > 0) {
+                if (maxSlotVal === timeSlotCounts.slot1) peakTimeStr = "Jam 10.00 s.d 14.00 (Slot 1)";
+                else if (maxSlotVal === timeSlotCounts.slot2) peakTimeStr = "Jam 14.00 s.d 18.00 (Slot 2)";
+                else if (maxSlotVal === timeSlotCounts.slot3) peakTimeStr = "Jam 18.00 s.d 22.00 (Slot 3)";
+                else peakTimeStr = "Diatas Jam 22.00 (Slot 4)";
+            }
+            let activeHoursInsight = `Jam paling aktif dikunjungi pelanggan adalah <b>${peakTimeStr}</b>. Rincian kunjungan: Slot 1 (10-14): ${timeSlotCounts.slot1}x, Slot 2 (14-18): ${timeSlotCounts.slot2}x, Slot 3 (18-22): ${timeSlotCounts.slot3}x, Malam (>22): ${timeSlotCounts.slot4}x.`;
+            document.getElementById("insight-active-hours").innerHTML = activeHoursInsight;
+
+            // Mapping Rekap Per Hari
+            filteredTx.forEach(tx => {
+                let parsed = parseStandardDate(tx.date);
+                let dateKey = parsed ? parsed.formatted : String(tx.date || "").trim();
+                if (!dateKey) return;
+
+                if (!dailyMap[dateKey]) {
+                    dailyMap[dateKey] = { date: dateKey, serviceSales: 0, productSales: 0, customers: 0, expenses: 0, cashIn: 0 };
+                }
+                dailyMap[dateKey].serviceSales += Number(tx.serviceSales || 0);
+                dailyMap[dateKey].productSales += Number(tx.productSales || 0);
+                dailyMap[dateKey].customers += 1;
+                if (tx.paymentMethod === "Cash") dailyMap[dateKey].cashIn += Number(tx.total || 0);
+            });
+
+            filteredExp.forEach(exp => {
+                let parsed = parseStandardDate(exp.date);
+                let dateKey = parsed ? parsed.formatted : String(exp.date || "").trim();
+                if (!dateKey) return;
+
+                if (!dailyMap[dateKey]) {
+                    dailyMap[dateKey] = { date: dateKey, serviceSales: 0, productSales: 0, customers: 0, expenses: 0, cashIn: 0 };
+                }
+                dailyMap[dateKey].expenses += Number(exp.amount || 0);
+            });
+
+            const tbody = document.getElementById("owner-daily-summary-body");
+            tbody.innerHTML = "";
+
+            let sortedDates = Object.keys(dailyMap).sort().reverse();
+
+            if (sortedDates.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">Belum ada data transaksi pada periode bulan ini.</td></tr>`;
+                return;
+            }
+
+            sortedDates.forEach(date => {
+                let day = dailyMap[date];
+                let cashDrawerBalance = day.cashIn - day.expenses;
+
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-blue-50 cursor-pointer transition";
+                tr.onclick = () => openDailyDetailModal(date);
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-gray-800">${day.date}</td>
+                    <td class="p-3 text-right">Rp${day.serviceSales.toLocaleString("id-ID")}</td>
+                    <td class="p-3 text-right">Rp${day.productSales.toLocaleString("id-ID")}</td>
+                    <td class="p-3 text-center font-semibold">${day.customers} Orang</td>
+                    <td class="p-3 text-right text-amber-700">Rp${day.expenses.toLocaleString("id-ID")}</td>
+                    <td class="p-3 text-right font-bold text-green-700">Rp${cashDrawerBalance.toLocaleString("id-ID")}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // MODAL KLIK OMZET BULAN BERJALAN (MENAMPILKAN RINCIAN HARIAN)
+        function openMonthlyOmzetModal() {
+            openCategoryDetailModal = openMonthlyOmzetModal; // Fallback helper or dedicated handler
+            // Kita gunakan modal rincian harian atau buat pop-up ringkasan omzet harian
+            const selectElem = document.getElementById("owner-month-select");
+            const selectedMonth = selectElem ? selectElem.value : "";
+            openDailyDetailModal(selectedMonth + "-01"); // Bisa memicu atau menampilkan rekap harian bulan ini
+        }
+
+        function openCategoryDetailModal(categoryName) {
+            const selectElem = document.getElementById("owner-month-select");
+            const selectedMonth = selectElem ? selectElem.value : "";
+            const [selYear, selMonth] = selectedMonth.split("-");
+
+            document.getElementById("category-modal-title").innerText = `Rincian: ${categoryName}`;
+            document.getElementById("category-modal-subtitle").innerText = `Periode: ${selectedMonth}`;
+
+            const tbody = document.getElementById("category-detail-table-body");
+            tbody.innerHTML = "";
+
+            let breakdownMap = {};
+
+            const filteredTx = transactionsDB.filter(t => {
+                let parsed = parseStandardDate(t.date);
+                return parsed ? (parsed.year === selYear && parsed.month === selMonth) : String(t.date).includes(selectedMonth);
+            });
+
+            filteredTx.forEach(tx => {
+                let parsedItems = safeParseItems(tx.items);
+                parsedItems.forEach(item => {
+                    let itemName = item.name || "Tanpa Nama";
+                    let qty = Number(item.qty || 1);
+                    let price = Number(item.price || 0);
+
+                    let masterMatch = itemsMaster.find(m => m.name.toLowerCase() === itemName.toLowerCase());
+                    let cat = item.category || (masterMatch ? masterMatch.category : "");
+
+                    if (cat === categoryName) {
+                        if (!breakdownMap[itemName]) {
+                            breakdownMap[itemName] = { qty: 0, totalSales: 0 };
+                        }
+                        breakdownMap[itemName].qty += qty;
+                        breakdownMap[itemName].totalSales += (price * qty);
+                    }
+                });
+            });
+
+            let itemKeys = Object.keys(breakdownMap);
+
+            if (itemKeys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400">Tidak ada item terjual pada kategori ini.</td></tr>`;
+            } else {
+                itemKeys.sort((a,b) => breakdownMap[b].qty - breakdownMap[a].qty).forEach(name => {
+                    let data = breakdownMap[name];
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="p-2 font-semibold text-gray-800">${name}</td>
+                        <td class="p-2 text-center font-bold text-blue-600">${data.qty} TRX</td>
+                        <td class="p-2 text-right font-medium">Rp${data.totalSales.toLocaleString("id-ID")}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            document.getElementById("category-detail-modal").classList.remove("hidden");
+        }
+
+        function closeCategoryDetailModal() {
+            document.getElementById("category-detail-modal").classList.add("hidden");
+        }
+
+        function openDailyDetailModal(dateStr) {
+            document.getElementById("modal-date-subtitle").innerText = `Tanggal / Filter: ${dateStr}`;
+            const tbody = document.getElementById("daily-detail-table-body");
+            tbody.innerHTML = "";
+
+            const dayTxList = transactionsDB.filter(t => {
+                let parsed = parseStandardDate(t.date);
+                let key = parsed ? parsed.formatted : String(t.date).trim();
+                return key.startsWith(String(dateStr).trim());
+            });
+
+            if (dayTxList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">Tidak ada transaksi penjualan pada rentang ini.</td></tr>`;
+            } else {
+                dayTxList.forEach(tx => {
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="p-2 text-gray-500">${tx.time || "-"}</td>
+                        <td class="p-2 font-semibold text-gray-800">${tx.barber || "-"}</td>
+                        <td class="p-2">${tx.customer || "-"}</td>
+                        <td class="p-2 text-right font-bold">Rp${Number(tx.total || 0).toLocaleString("id-ID")}</td>
+                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${tx.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">${tx.paymentMethod || "Cash"}</span></td>
+                        <td class="p-2 text-right">Rp${Number(tx.productSales || 0).toLocaleString("id-ID")}</td>
+                        <td class="p-2 text-right font-semibold text-blue-600">Rp${Number(tx.commission || 0).toLocaleString("id-ID")}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            document.getElementById("daily-detail-modal").classList.remove("hidden");
+        }
+
+        function closeDailyDetailModal() {
+            document.getElementById("daily-detail-modal").classList.add("hidden");
+        }
+
+        function sendWhatsAppReceipt(txRecord, visitCount) {
+            if (!txRecord.wa || txRecord.wa === "-" || txRecord.wa.trim() === "") {
+                alert("Nomor WA pelanggan tidak diisi/kosong!");
+                return;
+            }
+
+            let formattedWa = txRecord.wa.replace(/[^0-9]/g, '');
+            if (formattedWa.startsWith("0")) {
+                formattedWa = "62" + formattedWa.substring(1);
+            } else if (formattedWa.startsWith("8")) {
+                formattedWa = "62" + formattedWa;
+            }
+
+            let itemDetails = txRecord.items.map(i => `- ${i.name} (${i.qty}x) : Rp${(i.price * i.qty).toLocaleString("id-ID")}`).join("\n");
+
+            let message = `*URBANSTREET HAIRSTUDIO*\n` +
+                `----------------------------------------\n` +
+                `Nama Pelanggan: *${txRecord.customer}*\n` +
+                `Capster: *${txRecord.barber}*\n\n` +
+                `*Detail Layanan/Produk:*\n${itemDetails}\n\n` +
+                `Subtotal: Rp${txRecord.subtotal.toLocaleString("id-ID")}\n` +
+                `Diskon: Rp${txRecord.discount.toLocaleString("id-ID")}\n` +
+                `*Total Pembayaran: Rp${txRecord.total.toLocaleString("id-ID")}*\n` +
+                `----------------------------------------\n` +
+                `*Jumlah Kunjungan: Kunjungan ${visitCount} dari 5*\n` +
+                `_Notes: Free Wash Dry Hot Towel pada kunjungan ke-5_\n\n` +
+                `Terima Kasih Atas Kunjungannya Bro!`;
+
+            let waUrl = `https://wa.me/${formattedWa}?text=${encodeURIComponent(message)}`;
+            window.open(waUrl, '_blank');
+        }
+
+        function printThermalReceipt(txRecord, visitCount) {
+            document.getElementById("rec-date").innerText = `${txRecord.date} ${txRecord.time}`;
+            document.getElementById("rec-cust").innerText = txRecord.customer;
+            document.getElementById("rec-barber").innerText = txRecord.barber;
+            
+            let itemsContainer = document.getElementById("rec-items");
+            itemsContainer.innerHTML = "";
+            txRecord.items.forEach(i => {
+                itemsContainer.innerHTML += `
+                    <div class="flex justify-between">
+                        <span>${i.name} x${i.qty}</span>
+                        <span>Rp${(i.price * i.qty).toLocaleString("id-ID")}</span>
+                    </div>
+                `;
+            });
+
+            document.getElementById("rec-subtotal").innerText = `Rp${txRecord.subtotal.toLocaleString("id-ID")}`;
+            document.getElementById("rec-discount").innerText = `Rp${txRecord.discount.toLocaleString("id-ID")}`;
+            document.getElementById("rec-total").innerText = `Rp${txRecord.total.toLocaleString("id-ID")}`;
+            document.getElementById("rec-method").innerText = txRecord.paymentMethod;
+            document.getElementById("rec-visit-count").innerText = visitCount;
+
+            window.print();
+        }
+    </script>
+</body>
+</html>
