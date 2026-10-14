@@ -1133,7 +1133,7 @@
             return [];
         }
 
-        // RENDER DASHBOARD OWNER LENGKAP DENGAN OMZET BULAN BERJALAN & INSIGHT PEMASARAN
+        // RENDER DASHBOARD OWNER LENGKAP DENGAN OMZET BULAN BERJALAN & INSIGHT PEMASARAN REVISI 3 KATEGORI + NAMA HARI
         function renderOwnerDashboard() {
             const selectElem = document.getElementById("owner-month-select");
             if (!selectElem) return;
@@ -1160,7 +1160,7 @@
             let qtyHaircuts = 0, qtyAdditional = 0, qtyProducts = 0;
             let dailyMap = {};
             
-            // Variabel untuk Insight Pemasaran
+            // Variabel untuk Insight Pemasaran (3 Kategori + Nama Hari)
             let dailyCustomerCount = {}; // { "YYYY-MM-DD": count }
             let timeSlotCounts = { slot1: 0, slot2: 0, slot3: 0, slot4: 0 }; // Slot waktu
 
@@ -1181,7 +1181,6 @@
                     dailyCustomerCount[dateKey] = (dailyCustomerCount[dateKey] || 0) + 1;
                 }
 
-                // Analisis Jam Aktif Pelanggan berdasarkan tx.time (cth: "14:30" atau "14.30")
                 if (tx.time) {
                     let hourNum = parseInt(tx.time.replace('.', ':').split(':')[0], 10);
                     if (!isNaN(hourNum)) {
@@ -1208,7 +1207,6 @@
                 });
             });
 
-            // Render Total Omzet Bulan Berjalan
             document.getElementById("kpi-monthly-omzet").innerText = `Rp${totalMonthlyOmzet.toLocaleString("id-ID")}`;
 
             document.getElementById("commission-said").innerText = `Rp${totalCommSaid.toLocaleString("id-ID")}`;
@@ -1241,16 +1239,31 @@
             document.getElementById("kpi-fav-additional").innerText = findFavItemByCategory("Additional");
             document.getElementById("kpi-fav-product").innerText = findFavItemByCategory("Products");
 
-            // GENERATE MARKETING INSIGHTS
-            let quietDays = 0;
-            let busyDays = 0;
-            Object.values(dailyCustomerCount).forEach(count => {
-                if (count <= 4) quietDays++;
-                else busyDays++;
+            // GENERATE MARKETING INSIGHTS (REVISI 3 KATEGORI + NAMA HARI)
+            let sepiDays = [];
+            let sedangDays = [];
+            let ramaiDays = [];
+            let dayNamesId = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
+            Object.keys(dailyCustomerCount).forEach(dateStr => {
+                let count = dailyCustomerCount[dateStr];
+                let dObj = new Date(dateStr);
+                let dayName = !isNaN(dObj.getDay()) ? dayNamesId[dObj.getDay()] : dateStr;
+                let entryText = `${dayName} (${dateStr}: ${count} cust)`;
+
+                if (count <= 2) {
+                    sepiDays.push(entryText);
+                } else if (count >= 3 && count <= 5) {
+                    sedangDays.push(entryText);
+                } else {
+                    ramaiDays.push(entryText);
+                }
             });
 
-            let trafficInsight = `Dari total ${Object.keys(dailyCustomerCount).length} hari operasional tercatat ${quietDays} hari berstatus sepi (≤4 pelanggan) dan ${busyDays} hari berstatus ramai (>4 pelanggan). Tips: Berikan promo khusus di hari-hari sepi.`;
-            document.getElementById("insight-traffic").innerText = trafficInsight;
+            let trafficInsight = `• <b>Sepi (0-2 cust):</b> ${sepiDays.length > 0 ? sepiDays.join(', ') : 'Tidak ada'}<br>` +
+                                 `• <b>Sedang (3-5 cust):</b> ${sedangDays.length > 0 ? sedangDays.join(', ') : 'Tidak ada'}<br>` +
+                                 `• <b>Ramai (>6 cust):</b> ${ramaiDays.length > 0 ? ramaiDays.join(', ') : 'Tidak ada'}`;
+            document.getElementById("insight-traffic").innerHTML = trafficInsight;
 
             let maxSlotVal = Math.max(timeSlotCounts.slot1, timeSlotCounts.slot2, timeSlotCounts.slot3, timeSlotCounts.slot4);
             let peakTimeStr = "Belum cukup data";
@@ -1318,13 +1331,10 @@
             });
         }
 
-        // MODAL KLIK OMZET BULAN BERJALAN (MENAMPILKAN RINCIAN HARIAN)
         function openMonthlyOmzetModal() {
-            openCategoryDetailModal = openMonthlyOmzetModal; // Fallback helper or dedicated handler
-            // Kita gunakan modal rincian harian atau buat pop-up ringkasan omzet harian
             const selectElem = document.getElementById("owner-month-select");
             const selectedMonth = selectElem ? selectElem.value : "";
-            openDailyDetailModal(selectedMonth + "-01"); // Bisa memicu atau menampilkan rekap harian bulan ini
+            openDailyDetailModal(selectedMonth + "-01");
         }
 
         function openCategoryDetailModal(categoryName) {
