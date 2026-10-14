@@ -1324,7 +1324,7 @@
             // Kita gunakan modal rincian harian atau buat pop-up ringkasan omzet harian
             const selectElem = document.getElementById("owner-month-select");
             const selectedMonth = selectElem ? selectElem.value : "";
-            openDailyDetailModal(selectedMonth + "-01"); // Bisa memicu atau menampilkan rekap harian bulan ini
+            openDailyDetailModal(selectedMonth); // Bisa memicu atau menampilkan rekap harian bulan ini
         }
 
         function openCategoryDetailModal(categoryName) {
