@@ -281,7 +281,7 @@
                     <div onclick="openMonthlyOmzetModal()" class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-3 rounded-lg cursor-pointer hover:shadow transition">
                         <p class="text-[11px] text-indigo-600 font-bold uppercase">Total Omzet Bulan Berjalan</p>
                         <p id="kpi-monthly-omzet" class="text-base font-extrabold text-indigo-900 mt-0.5">Rp0</p>
-                        <span class="text-[10px] text-indigo-600 underline mt-0.5 block">Klik rincian harian &rarr;</span>
+                        <span class="text-[10px] text-indigo-600 underline mt-0.5 block">Klik rincian omzet harian &rarr;</span>
                     </div>
                     <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg">
                         <p class="text-[11px] text-blue-600 font-bold uppercase">Best Capster of The Month</p>
@@ -471,6 +471,37 @@
             </div>
 
             <button onclick="closeDailyDetailModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg mt-5 transition text-xs">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL KHUSUS RINCIAN OMZET HARIAN BULAN BERJALAN -->
+    <div id="monthly-omzet-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-lg w-full shadow-xl">
+            <div class="flex justify-between items-center border-b pb-3 mb-3">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">Rincian Omzet Harian</h3>
+                    <p id="monthly-omzet-subtitle" class="text-xs text-gray-500"></p>
+                </div>
+                <button onclick="closeMonthlyOmzetModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            
+            <div class="max-h-80 overflow-y-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 text-gray-500 border-b sticky top-0">
+                        <tr>
+                            <th class="p-2">Tanggal</th>
+                            <th class="p-2 text-center">Jumlah Transaksi</th>
+                            <th class="p-2 text-right">Total Omzet</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monthly-omzet-table-body" class="divide-y">
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="closeMonthlyOmzetModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg mt-5 transition text-xs">
                 Tutup
             </button>
         </div>
@@ -952,7 +983,7 @@
             if (barberName === "Heri" || currentHour >= 22 || currentHour < 10) {
                 serviceCommRate = 0.50;
             }
-            const productCommRate = 0.20; // Komisi produk diubah menjadi 20%
+            const productCommRate = 0.20;
             const commission = (serviceSales * serviceCommRate) + (productSales * productCommRate);
 
             const txRecord = {
@@ -1133,7 +1164,6 @@
             return [];
         }
 
-        // RENDER DASHBOARD OWNER LENGKAP DENGAN OMZET BULAN BERJALAN & INSIGHT PEMASARAN
         function renderOwnerDashboard() {
             const selectElem = document.getElementById("owner-month-select");
             if (!selectElem) return;
@@ -1160,9 +1190,8 @@
             let qtyHaircuts = 0, qtyAdditional = 0, qtyProducts = 0;
             let dailyMap = {};
             
-            // Variabel untuk Insight Pemasaran
-            let dailyCustomerCount = {}; // { "YYYY-MM-DD": count }
-            let timeSlotCounts = { slot1: 0, slot2: 0, slot3: 0, slot4: 0 }; // Slot waktu
+            let dailyCustomerCount = {}; 
+            let timeSlotCounts = { slot1: 0, slot2: 0, slot3: 0, slot4: 0 }; 
 
             filteredTx.forEach(tx => {
                 let txTotal = Number(tx.total || 0);
@@ -1181,7 +1210,6 @@
                     dailyCustomerCount[dateKey] = (dailyCustomerCount[dateKey] || 0) + 1;
                 }
 
-                // Analisis Jam Aktif Pelanggan berdasarkan tx.time (cth: "14:30" atau "14.30")
                 if (tx.time) {
                     let hourNum = parseInt(tx.time.replace('.', ':').split(':')[0], 10);
                     if (!isNaN(hourNum)) {
@@ -1208,7 +1236,6 @@
                 });
             });
 
-            // Render Total Omzet Bulan Berjalan
             document.getElementById("kpi-monthly-omzet").innerText = `Rp${totalMonthlyOmzet.toLocaleString("id-ID")}`;
 
             document.getElementById("commission-said").innerText = `Rp${totalCommSaid.toLocaleString("id-ID")}`;
@@ -1241,16 +1268,31 @@
             document.getElementById("kpi-fav-additional").innerText = findFavItemByCategory("Additional");
             document.getElementById("kpi-fav-product").innerText = findFavItemByCategory("Products");
 
-            // GENERATE MARKETING INSIGHTS
-            let quietDays = 0;
-            let busyDays = 0;
-            Object.values(dailyCustomerCount).forEach(count => {
-                if (count <= 4) quietDays++;
-                else busyDays++;
+            // MARKETING INSIGHTS
+            let sepiDays = [];
+            let sedangDays = [];
+            let ramaiDays = [];
+            let dayNamesId = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
+            Object.keys(dailyCustomerCount).forEach(dateStr => {
+                let count = dailyCustomerCount[dateStr];
+                let dObj = new Date(dateStr);
+                let dayName = !isNaN(dObj.getDay()) ? dayNamesId[dObj.getDay()] : dateStr;
+                let entryText = `${dayName} (${dateStr}: ${count} cust)`;
+
+                if (count <= 2) {
+                    sepiDays.push(entryText);
+                } else if (count >= 3 && count <= 5) {
+                    sedangDays.push(entryText);
+                } else {
+                    ramaiDays.push(entryText);
+                }
             });
 
-            let trafficInsight = `Dari total ${Object.keys(dailyCustomerCount).length} hari operasional tercatat ${quietDays} hari berstatus sepi (≤4 pelanggan) dan ${busyDays} hari berstatus ramai (>4 pelanggan). Tips: Berikan promo khusus di hari-hari sepi.`;
-            document.getElementById("insight-traffic").innerText = trafficInsight;
+            let trafficInsight = `• <b>Sepi (0-2 cust):</b> ${sepiDays.length > 0 ? sepiDays.join(', ') : 'Tidak ada'}<br>` +
+                                 `• <b>Sedang (3-5 cust):</b> ${sedangDays.length > 0 ? sedangDays.join(', ') : 'Tidak ada'}<br>` +
+                                 `• <b>Ramai (>6 cust):</b> ${ramaiDays.length > 0 ? ramaiDays.join(', ') : 'Tidak ada'}`;
+            document.getElementById("insight-traffic").innerHTML = trafficInsight;
 
             let maxSlotVal = Math.max(timeSlotCounts.slot1, timeSlotCounts.slot2, timeSlotCounts.slot3, timeSlotCounts.slot4);
             let peakTimeStr = "Belum cukup data";
@@ -1318,15 +1360,65 @@
             });
         }
 
-        // MODAL KLIK OMZET BULAN BERJALAN (MENAMPILKAN RINCIAN HARIAN)
+        // PERBAIKAN: MODAL KHUSUS DAFTAR OMZET HARIAN PER TANGGAL (KETIKA DIKLIK "TOTAL OMZET BULAN BERJALAN")
         function openMonthlyOmzetModal() {
-            openCategoryDetailModal = openMonthlyOmzetModal; // Fallback helper or dedicated handler
-            // Kita gunakan modal rincian harian atau buat pop-up ringkasan omzet harian
             const selectElem = document.getElementById("owner-month-select");
             const selectedMonth = selectElem ? selectElem.value : "";
-            openDailyDetailModal(selectedMonth); // Bisa memicu atau menampilkan rekap harian bulan ini
+            const [selYear, selMonth] = selectedMonth.split("-");
+
+            document.getElementById("monthly-omzet-subtitle").innerText = `Periode Bulan: ${selectedMonth}`;
+            const tbody = document.getElementById("monthly-omzet-table-body");
+            tbody.innerHTML = "";
+
+            let dailyOmzetMap = {};
+
+            const filteredTx = transactionsDB.filter(t => {
+                let parsed = parseStandardDate(t.date);
+                return parsed ? (parsed.year === selYear && parsed.month === selMonth) : String(t.date).includes(selectedMonth);
+            });
+
+            filteredTx.forEach(tx => {
+                let parsed = parseStandardDate(tx.date);
+                let dateKey = parsed ? parsed.formatted : String(tx.date || "").trim();
+                if (!dateKey) return;
+
+                if (!dailyOmzetMap[dateKey]) {
+                    dailyOmzetMap[dateKey] = { txCount: 0, totalOmzet: 0 };
+                }
+                dailyOmzetMap[dateKey].txCount += 1;
+                dailyOmzetMap[dateKey].totalOmzet += Number(tx.total || 0);
+            });
+
+            let dateKeys = Object.keys(dailyOmzetMap).sort().reverse();
+
+            if (dateKeys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400">Tidak ada omzet pada bulan ini.</td></tr>`;
+            } else {
+                dateKeys.forEach(date => {
+                    let data = dailyOmzetMap[date];
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-gray-50 cursor-pointer";
+                    tr.onclick = () => {
+                        closeMonthlyOmzetModal();
+                        openDailyDetailModal(date); // Bisa langsung lihat rincian transaksi tanggal tersebut
+                    };
+                    tr.innerHTML = `
+                        <td class="p-2 font-bold text-gray-800">${date}</td>
+                        <td class="p-2 text-center text-blue-600 font-semibold">${data.txCount} Transaksi</td>
+                        <td class="p-2 text-right font-bold text-gray-900">Rp${data.totalOmzet.toLocaleString("id-ID")}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            document.getElementById("monthly-omzet-modal").classList.remove("hidden");
         }
 
+        function closeMonthlyOmzetModal() {
+            document.getElementById("monthly-omzet-modal").classList.add("hidden");
+        }
+
+        // PERBAIKAN: MEMASTIKAN KATEGORI ITEM COCOK DENGAN MASTER DATA (HAIRCUTS / ADDITIONAL / PRODUCTS)
         function openCategoryDetailModal(categoryName) {
             const selectElem = document.getElementById("owner-month-select");
             const selectedMonth = selectElem ? selectElem.value : "";
@@ -1352,8 +1444,9 @@
                     let qty = Number(item.qty || 1);
                     let price = Number(item.price || 0);
 
+                    // Cari kategori valid langsung dari Master Data agar tidak salah tangkap
                     let masterMatch = itemsMaster.find(m => m.name.toLowerCase() === itemName.toLowerCase());
-                    let cat = item.category || (masterMatch ? masterMatch.category : "");
+                    let cat = masterMatch ? masterMatch.category : (item.category || "");
 
                     if (cat === categoryName) {
                         if (!breakdownMap[itemName]) {
@@ -1376,7 +1469,7 @@
                     tr.className = "hover:bg-gray-50";
                     tr.innerHTML = `
                         <td class="p-2 font-semibold text-gray-800">${name}</td>
-                        <td class="p-2 text-center font-bold text-blue-600">${data.qty} TRX</td>
+                        <td class="p-2 text-center font-bold text-blue-600">${data.qty}x Terjual</td>
                         <td class="p-2 text-right font-medium">Rp${data.totalSales.toLocaleString("id-ID")}</td>
                     `;
                     tbody.appendChild(tr);
